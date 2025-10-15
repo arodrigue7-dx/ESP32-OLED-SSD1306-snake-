@@ -3,14 +3,14 @@ import ssd1306
 import utime
 import urandom as random
 
-# ESP32 Pin assignment 
+# Assignació de pins per a l'ESP32
 i2c = I2C(0, scl=Pin(22), sda=Pin(21))
 
 oled_width = 128
 oled_height = 64
 oled = ssd1306.SSD1306_I2C(oled_width, oled_height, i2c)
 
-buttonPins = [Pin(17), Pin(4), Pin(5), Pin(16)]  # LEFT, UP, RIGHT, DOWN
+buttonPins = [Pin(17), Pin(4), Pin(5), Pin(16)]  # ESQUERRA, AMUNT, DRETA, AVALL
 
 class State:
     START = 0
@@ -42,7 +42,6 @@ def setupGame():
     drawScore()
     drawPressToStart()
     oled.show()
-
 
 def resetSnake():
     global snake_length
@@ -92,7 +91,7 @@ def readDirection():
         buttonPin = buttonPins[i]
         if buttonPin.value() == 0 and i != (dir + 2) % 4:
             newDir = i
-            dir = newDir  # Burada dir değişkenini güncelledik
+            dir = newDir
             return
 
 def moveSnake():
@@ -159,7 +158,6 @@ def drawMap():
     offsetMapY = 2
 
     oled.rect(fruit[0] * 3 + offsetMapX, fruit[1] * 3 + offsetMapY, 3, 3, 1)
-
     oled.rect(offsetMapX - 2, 0, 3 * 20 + 4, 3 * 20 + 4, 1)
 
     for i in range(snake_length):
@@ -167,10 +165,11 @@ def drawMap():
 
 def drawScore():
     global snake_length
-    oled.text("Score: {}".format(snake_length - 5), 2, 2)
+    oled.text("Punts: {}".format(snake_length - 5), 2, 2)
 
 def drawPressToStart():
-    oled.text("Press a button to start the game!", 2, 20)
+    oled.text("Prem un botó per començar!", 2, 20)
 
 def drawGameover():
-    oled.text("GAMEOVER", 2, 50)
+    oled.text("FI DEL JOC", 2, 50)
+
