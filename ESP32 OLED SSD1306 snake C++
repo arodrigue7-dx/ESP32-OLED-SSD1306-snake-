@@ -1,0 +1,230 @@
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <stdlib.h> // Include the standard library for random number generation
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+#define RIGHT 0
+#define UP    1
+#define LEFT  2
+#define DOWN  3
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+int score = 0;
+int level = 1;
+int gamespeed = 100;
+bool isGameOver = false;
+int i;
+int dir;
+
+const int buzzerPin = 18; 
+
+struct FOOD {
+  int x;
+  int y;
+  int yes;
+};
+
+struct SNAKE {
+  int x[200];
+  int y[200];
+  int node;
+  int dir;
+};
+
+FOOD food;
+SNAKE snake;
+
+const uint8_t ele[] PROGMEM = {
+  0xff, //B11110000
+  0xff, //B10110000
+  0xff, //B11010000
+  0xff, //B11110000
+  0xff, //B11110000
+  0xff, //B10110000
+  0xff, //B11010000
+  0xff, //B11110000
+};
+
+void element(int x, int y) {
+  display.drawBitmap(x, y, ele, 8, 8, 1);
+}
+
+void UI() {
+  display.drawRect(0, 1, 128, 64, WHITE);
+  display.drawRect(0, 0, 128, 64, WHITE);
+}
+
+void buttonUpISR() {
+  dir = UP;
+}
+
+void buttonDownISR() {
+  dir = DOWN;
+}
+
+void buttonLeftISR() {
+  dir = LEFT;
+}
+
+void buttonRightISR() {
+  dir = RIGHT;
+}
+
+void snakeGame() {
+  switch (snake.dir) {
+    case RIGHT:
+      snake.x[0] += 8;
+      if(snake.x[0] > 120)
+        snake.x[0] = 0;
+      break;
+    case UP:
+      snake.y[0] -= 8;  
+      if(snake.y[0] < 0)
+        snake.y[0] = 56;
+      break;
+    case LEFT:
+      snake.x[0] -= 8;
+      if(snake.x[0] < 0)
+        snake.x[0] = 120;  
+      break;
+    case DOWN:
+      snake.y[0] += 8;
+      if(snake.y[0] > 56)
+        snake.y[0] = 0; 
+      break;
+  }
+
+  // Checks for snake's collision with the food
+  if ((snake.x[0] == food.x) && (snake.y[0] == food.y)) {
+    snake.x[0] = food.x;
+    snake.y[0] = food.y;
+    snake.node++;
+    food.yes = 1;
+    score += 2;
+    level = score / 10 + 1;
+    tone(buzzerPin, 1000); // Play a tone when food is eaten
+    delay(100);
+    noTone(buzzerPin);
+    generateFood(); // Generate new food
+  }
+
+  // Checks for collision with the body
+    for (int i = 1; i < snake.node; i++)
+      if(snake.x[0] == snake.x[i] && snake.y[0] == snake.y[i])
+        isGameOver = true; 
+
+  // update snake body
+  for (i = snake.node - 1; i > 0; i--) {
+    snake.x[i] = snake.x[i - 1];
+    snake.y[i] = snake.y[i - 1];
+  }
+}
+
+void key() {
+  if (dir == DOWN && snake.dir != UP) {
+    snake.dir = DOWN;
+  }
+  if (dir == RIGHT && snake.dir != LEFT) {
+    snake.dir = RIGHT;
+  }
+  if (dir == LEFT && snake.dir != RIGHT) {
+    snake.dir = LEFT;
+  }
+  if (dir == UP && snake.dir != DOWN) {
+    snake.dir = UP;
+  }
+}
+
+void generateFood() {
+  // Generate random x and y coordinates for food within the screen bounds
+  do {
+    food.x = random(0, 15) * 8;
+    food.y = random(1, 7) * 8;
+  } while (isFoodOnSnake());
+}
+
+bool isFoodOnSnake() {
+  for (int i = 0; i < snake.node; i++) {
+    if (food.x == snake.x[i] && food.y == snake.y[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void displaySnake(){ 
+  for (i = 0; i < snake.node; i++)
+    element(snake.x[i], snake.y[i]);
+}
+
+void setup() {
+  pinMode(15, INPUT_PULLUP);
+  pinMode(2, INPUT_PULLUP);
+  pinMode(4, INPUT_PULLUP);
+  pinMode(5, INPUT_PULLUP);
+  
+  pinMode(buzzerPin, OUTPUT); // Set buzzer pin as output
+
+  attachInterrupt(digitalPinToInterrupt(5), buttonUpISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(2), buttonDownISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(15), buttonLeftISR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(4), buttonRightISR, FALLING);
+
+  // Initialize random seed
+  randomSeed(analogRead(0));
+
+  // Initialize food
+  food = {40, 48, 1};
+
+  // Initialize snake
+  snake.x[0] = 64;  
+  snake.y[0] = 32;  
+  snake.x[1] = 60;  
+  snake.y[1] = 32;  
+  snake.dir = RIGHT;
+  snake.node = 2;
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;);
+  }
+  display.display();
+  delay(2000);
+  display.clearDisplay();
+}
+
+void gameOver() {
+  digitalWrite(buzzerPin, HIGH); // Turn on buzzer when game is over
+  delay(500);
+  digitalWrite(buzzerPin, LOW); // Turn off buzzer after 500ms
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(20, 20);
+  display.println("Game Over");
+  display.setCursor(30, 40);
+  display.print("Score ");
+  display.println(score);
+  display.display();
+}
+
+
+void loop() {
+  while(!isGameOver)
+  {
+    display.clearDisplay();
+    //UI(); 
+    displaySnake();
+    element(food.x, food.y);
+
+    display.display();
+    
+    key();
+    snakeGame();
+    delay(gamespeed);
+  }
+  gameOver();
+}
